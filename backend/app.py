@@ -177,23 +177,9 @@ def create_app():
 		})
 
 	# 管理: 重設範例資料（清除並重新建立 products + transactions）
+	# NOTE: 為了簡單作業目的，此 endpoint 不再做管理員驗證，前端可直接呼叫（開發/教學用途）。
 	@app.route('/api/reset_seed', methods=['POST'])
 	def reset_seed():
-		# NOTE: this endpoint is destructive; protected by ADMIN_KEY if present, otherwise by ALLOW_DESTRUCTIVE
-		if admin_key:
-			provided = request.headers.get('X-ADMIN-KEY')
-			if not provided or provided != admin_key:
-				return jsonify({'error': 'forbidden (invalid admin key)'}), 403
-		else:
-			# Recompute allowed state at request time (app.debug may be set after create_app)
-			allowed = (
-				str(os.environ.get('ALLOW_DESTRUCTIVE', 'false')).lower() in ('1', 'true', 'yes')
-				or str(os.environ.get('FLASK_DEBUG', 'false')).lower() in ('1', 'true', 'yes')
-				or str(os.environ.get('FLASK_ENV', '')).lower() == 'development'
-				or app.debug
-			)
-			if not allowed:
-				return jsonify({'error': 'destructive endpoints are disabled; set ALLOW_DESTRUCTIVE=1 or run with FLASK_DEBUG=1 or FLASK_ENV=development, or provide ADMIN_KEY'}), 403
 		try:
 			# remove children first
 			TransactionItem.query.delete()
@@ -246,20 +232,7 @@ def create_app():
 	@app.route('/api/init_db', methods=['POST'])
 	def init_db_endpoint():
 		# Create tables and optionally seed minimal products (for first-time setup)
-		if admin_key:
-			provided = request.headers.get('X-ADMIN-KEY')
-			if not provided or provided != admin_key:
-				return jsonify({'error': 'forbidden (invalid admin key)'}), 403
-		else:
-			# Recompute allowed state at request time
-			allowed = (
-				str(os.environ.get('ALLOW_DESTRUCTIVE', 'false')).lower() in ('1', 'true', 'yes')
-				or str(os.environ.get('FLASK_DEBUG', 'false')).lower() in ('1', 'true', 'yes')
-				or str(os.environ.get('FLASK_ENV', '')).lower() == 'development'
-				or app.debug
-			)
-			if not allowed:
-				return jsonify({'error': 'destructive endpoints are disabled; set ALLOW_DESTRUCTIVE=1 or run with FLASK_DEBUG=1 or FLASK_ENV=development, or provide ADMIN_KEY'}), 403
+		# NOTE: 為了簡單作業目的，此 endpoint 不再做管理員驗證，前端可直接呼叫（開發/教學用途）。
 		# Combined behavior: ensure tables exist, then remove existing data and seed sample products + transactions
 		try:
 			with app.app_context():
