@@ -83,20 +83,34 @@
 		const btn = document.getElementById('resetSeedBtn');
 		if(btn){
 			btn.addEventListener('click', ()=>{
+				console.log('[resetSeedBtn] clicked');
 				if(!confirm('確定要清除並重新建立範例資料嗎？這會建立資料表（如尚未建立）並刪除所有交易與產品資料。')) return;
 				btn.disabled = true;
-				// 先確保資料表存在（init），再執行重設（reset_seed）
-				fetch(apiBase + '/init_db', { method: 'POST' })
-					.catch(()=>({ ok: false }))
-					.then(() => fetch(apiBase + '/reset_seed', { method: 'POST' }))
-					.then(async r => {
+				const initUrl = apiBase + '/init_db';
+				const resetUrl = apiBase + '/reset_seed';
+				console.log('[resetSeedBtn] calling init:', initUrl);
+				fetch(initUrl, { method: 'POST' })
+					.then(initRes => {
+						console.log('[resetSeedBtn] init response status:', initRes.status);
+						return fetch(resetUrl, { method: 'POST' });
+					})
+					.then(async resetRes => {
+						console.log('[resetSeedBtn] reset response status:', resetRes.status);
 						btn.disabled = false;
-						if(!r.ok) throw new Error('重設失敗');
-						try{ const data = await r.json(); }catch(e){}
+						if(!resetRes.ok){
+							const errBody = await resetRes.text().catch(()=>'<no-body>');
+							console.error('[resetSeedBtn] reset failed body:', errBody);
+							throw new Error('重設失敗');
+						}
+						try{ const data = await resetRes.json(); console.log('[resetSeedBtn] reset response body:', data);}catch(e){}
 						if(typeof showToast === 'function') showToast('已初始化並重設範例資料', 'success');
 						else alert('已初始化並重設範例資料');
 						setTimeout(()=> location.reload(), 700);
-					}).catch(()=>{ btn.disabled = false; if(typeof showToast === 'function') showToast('初始化或重設失敗','error'); else alert('初始化或重設失敗'); });
+					}).catch(err=>{
+						console.error('[resetSeedBtn] error:', err);
+						btn.disabled = false;
+						if(typeof showToast === 'function') showToast('初始化或重設失敗','error'); else alert('初始化或重設失敗');
+					});
 			});
 		}
 });
