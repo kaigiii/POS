@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from db import Base
 from datetime import datetime
@@ -11,6 +11,7 @@ class Product(Base):
     price = Column(Float, nullable=False)
     cost = Column(Float, nullable=False)
     stock = Column(Integer, default=0, nullable=False)
+    is_deleted = Column(Boolean, default=False, nullable=False)
 
 
 class Transaction(Base):

@@ -102,6 +102,9 @@ python backend/seed_fake_data.py  # 重建大量範例商品 + 隨機交易
 
 注意：目前 `app.py` 中 `POST /api/init_db` 與 `POST /api/reset_seed` 為公開可呼叫（無驗證），若要在公開環境使用，請務必保護這些路由（例如在實作中使用 `X-ADMIN-KEY` 或其他認證機制）。
 
+刪除行為說明：
+- 本系統採用「軟刪除」(soft-delete) 策略：當你呼叫 `DELETE /api/products/{id}` 時，產品會被標記為 `is_deleted=true`，而不會實際從資料庫刪除。這樣可以保留 `TransactionItem` 與交易歷史的一致性，同時在產品管理介面隱藏被刪除的商品。前端與 API `GET /api/products` 會過濾掉已標記為刪除的商品。
+
 **HTTP API 概覽**
 - **GET /** : 健康檢查，回傳 `{'message': 'POS API Server', 'status': 'running', 'docs': '/docs'}`
 - **GET /health** : 回傳 `{'status': 'ok'}`

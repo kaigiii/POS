@@ -73,7 +73,7 @@ def health():
 
 @app.get('/api/products')
 def get_products(db: Session = Depends(get_db)):
-	products = db.query(Product).all()
+	products = db.query(Product).filter(Product.is_deleted == False).all()
 	return [
 		{'id': p.id, 'name': p.name, 'price': p.price, 'cost': p.cost, 'stock': p.stock}
 		for p in products
@@ -93,6 +93,9 @@ def add_product(payload: ProductCreate, db: Session = Depends(get_db)):
 def get_product(product_id: int, db: Session = Depends(get_db)):
 	p = db.get(Product, product_id)
 	if not p:
+		raise HTTPException(status_code=404, detail='Product not found')
+	if getattr(p, 'is_deleted', False):
+		# hide soft-deleted products
 		raise HTTPException(status_code=404, detail='Product not found')
 	return {'id': p.id, 'name': p.name, 'price': p.price, 'cost': p.cost, 'stock': p.stock}
 
@@ -119,14 +122,11 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
 	p = db.get(Product, product_id)
 	if not p:
 		raise HTTPException(status_code=404, detail='Product not found')
+	# Soft-delete: mark product as deleted so it is hidden from product listings
 	try:
-		db.delete(p)
+		p.is_deleted = True
 		db.commit()
-		return {'message': 'Product deleted'}
-	except IntegrityError:
-		db.rollback()
-		# Likely referenced by transactions / FK constraint in some DB backends
-		raise HTTPException(status_code=400, detail='Cannot delete product: it is referenced by transactions')
+		return {'message': 'Product soft-deleted'}
 	except Exception as e:
 		db.rollback()
 		raise HTTPException(status_code=500, detail=str(e))
