@@ -16,6 +16,7 @@
 					<div class="brand-sub">快速結帳</div>
 				</div>
 			</div>
+			<button id="navToggle" class="hamburger" aria-label="開啟選單">☰</button>
 			<div class="nav-links">
 				<a href="index.html" class="active">銷售頁</a>
 				<a href="transactions.html">交易記錄</a>
@@ -24,7 +25,7 @@
 			</div>
 		</div>
 
-		<div class="card" style="display:grid;grid-template-columns:1fr 360px;gap:18px;align-items:start">
+		<div class="card layout-2col" style="gap:18px;align-items:start;display:grid;grid-template-columns:1fr 360px">
 			<!-- Left: product browser -->
 			<section id="productBrowser">
 				<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
@@ -41,7 +42,7 @@
 			</section>
 
 			<!-- Right: cart panel -->
-			<aside id="cartPanel" style="position:sticky;top:20px">
+			<aside id="cartPanel">
 				<div style="display:flex;justify-content:space-between;align-items:center">
 					<h2 style="margin:0">購物車</h2>
 					<div class="muted" id="cartCount">0 件</div>
@@ -74,6 +75,7 @@
 
 	<div class="toast-container" id="toastContainer" aria-live="polite"></div>
 	<script>window.__API_URL__ = 'https://pos-lb9c.onrender.com';</script>
+	<script src="nav.js"></script>
 	<script src="posLogic.js"></script>
 
 	<script>

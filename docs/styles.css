@@ -65,6 +65,53 @@ tbody td{padding:12px;border-bottom:1px solid #f1f5f9}
 	form input[type='text'], form input[type='number'], #productSearch{width:140px}
 }
 
+/* Responsive improvements */
+@media (max-width:900px){
+	/* Stack two-column layouts to single column (use flex so we can reorder) */
+	.layout-2col{display:flex !important;flex-direction:column}
+	.layout-2col > section, .layout-2col > aside{width:100%;margin-bottom:14px}
+	/* Put cart panel above products on small screens */
+	#cartPanel{position:static !important;top:auto;order:-1}
+	/* Make product search and form inputs full width */
+	form input[type='text'], form input[type='number'], #productSearch{width:100%;max-width:100%}
+	.filter-bar{flex-direction:column;align-items:stretch}
+	.filter-bar input, .filter-bar select, .filter-bar .btn{width:100%}
+	.stats-row{flex-direction:column}
+	.stat{min-width:unset;width:100%}
+	/* Reduce product thumb height for small screens */
+	.product-thumb{height:92px}
+	/* Product grid: make cards full width on very small screens */
+	.product-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+}
+
+/* Navbar responsive: wrap nav links and allow wrapping into multiple lines */
+.nav-links{flex-wrap:wrap}
+.nav-links a, .nav-links button{margin-top:6px}
+
+/* Modal adjustments for small screens */
+@media (max-width:420px){
+	.modal{max-width:100%;height:100%;border-radius:0;padding:16px;overflow:auto}
+}
+
+/* Utility: make buttons full width when container has .fullwidth-btns */
+.fullwidth-btns .btn{width:100%}
+
+/* Hamburger / mobile nav */
+.hamburger{display:none;background:transparent;border:1px solid rgba(11,87,208,0.08);padding:8px 10px;border-radius:8px;font-size:18px;cursor:pointer}
+.hamburger.active{background:var(--primary);color:#fff}
+
+@media (max-width:900px){
+	.hamburger{display:inline-flex;align-items:center}
+	.nav-links{display:none;position:fixed;inset:auto 12px 12px 12px;background:var(--surface);box-shadow:0 20px 60px rgba(2,6,23,0.2);border-radius:12px;padding:12px;flex-direction:column;gap:8px;z-index:1000}
+	/* Center the nav-links as a floating panel when opened */
+	.nav-links.open{display:flex;left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);position:fixed;width:calc(100% - 48px);max-width:420px;padding:18px}
+	.nav-links a{display:block}
+}
+
+/* Make the reset seed button text red */
+#resetSeedBtn{color:#d64545;border-color:rgba(214,69,69,0.12)}
+#resetSeedBtn:hover{background:rgba(214,69,69,0.06)}
+
 /* Toast notifications */
 .toast-container{position:fixed;right:20px;bottom:20px;z-index:1000;display:flex;flex-direction:column;gap:10px}
 .toast{background:linear-gradient(90deg,var(--primary),var(--accent));color:white;padding:10px 14px;border-radius:10px;box-shadow:0 8px 24px rgba(11,87,208,0.18);min-width:200px}
