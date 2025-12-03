@@ -60,6 +60,11 @@ def on_startup():
 	init_db()
 
 
+@app.get('/')
+def root():
+	return {'message': 'POS API Server', 'status': 'running', 'docs': '/docs'}
+
+
 @app.get('/health')
 def health():
 	return {'status': 'ok'}
