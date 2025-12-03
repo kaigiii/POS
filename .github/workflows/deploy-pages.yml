@@ -21,9 +21,11 @@ jobs:
         uses: actions/configure-pages@v3
 
       - name: Upload frontend directory as Pages artifact
-        uses: actions/upload-pages-artifact@v1
+        # use v2 which depends on newer upload-artifact versions
+        uses: actions/upload-pages-artifact@v2
         with:
           path: ./frontend
 
       - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v1
+        # use v2 which has more recent dependencies
+        uses: actions/deploy-pages@v2
