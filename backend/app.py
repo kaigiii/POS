@@ -40,7 +40,10 @@ def create_app():
 	# set ALLOW_DESTRUCTIVE=1 or 'true' in environment to allow these endpoints
 	# For developer convenience: also allow when Flask is running in debug mode
 	allow_destructive_env = str(os.environ.get('ALLOW_DESTRUCTIVE', 'false')).lower() in ('1', 'true', 'yes')
-	allow_destructive = allow_destructive_env or app.debug
+	# Allow destructive actions in development or when explicitly enabled.
+	flask_debug_env = str(os.environ.get('FLASK_DEBUG', 'false')).lower() in ('1', 'true', 'yes')
+	flask_env_is_dev = str(os.environ.get('FLASK_ENV', '')).lower() == 'development'
+	allow_destructive = allow_destructive_env or flask_debug_env or flask_env_is_dev or app.debug
 	# optional admin key: if set, endpoints require header X-ADMIN-KEY to match
 	admin_key = os.environ.get('ADMIN_KEY')
 	@app.route('/api/products', methods=['GET'])
