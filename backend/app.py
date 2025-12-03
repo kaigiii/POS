@@ -185,8 +185,15 @@ def create_app():
 			if not provided or provided != admin_key:
 				return jsonify({'error': 'forbidden (invalid admin key)'}), 403
 		else:
-			if not allow_destructive and os.environ.get('FLASK_ENV') != 'development':
-				return jsonify({'error': 'destructive endpoints are disabled'}), 403
+			# Recompute allowed state at request time (app.debug may be set after create_app)
+			allowed = (
+				str(os.environ.get('ALLOW_DESTRUCTIVE', 'false')).lower() in ('1', 'true', 'yes')
+				or str(os.environ.get('FLASK_DEBUG', 'false')).lower() in ('1', 'true', 'yes')
+				or str(os.environ.get('FLASK_ENV', '')).lower() == 'development'
+				or app.debug
+			)
+			if not allowed:
+				return jsonify({'error': 'destructive endpoints are disabled; set ALLOW_DESTRUCTIVE=1 or run with FLASK_DEBUG=1 or FLASK_ENV=development, or provide ADMIN_KEY'}), 403
 		try:
 			# remove children first
 			TransactionItem.query.delete()
@@ -244,8 +251,15 @@ def create_app():
 			if not provided or provided != admin_key:
 				return jsonify({'error': 'forbidden (invalid admin key)'}), 403
 		else:
-			if not allow_destructive and os.environ.get('FLASK_ENV') != 'development':
-				return jsonify({'error': 'destructive endpoints are disabled'}), 403
+			# Recompute allowed state at request time
+			allowed = (
+				str(os.environ.get('ALLOW_DESTRUCTIVE', 'false')).lower() in ('1', 'true', 'yes')
+				or str(os.environ.get('FLASK_DEBUG', 'false')).lower() in ('1', 'true', 'yes')
+				or str(os.environ.get('FLASK_ENV', '')).lower() == 'development'
+				or app.debug
+			)
+			if not allowed:
+				return jsonify({'error': 'destructive endpoints are disabled; set ALLOW_DESTRUCTIVE=1 or run with FLASK_DEBUG=1 or FLASK_ENV=development, or provide ADMIN_KEY'}), 403
 		# Combined behavior: ensure tables exist, then remove existing data and seed sample products + transactions
 		try:
 			with app.app_context():
