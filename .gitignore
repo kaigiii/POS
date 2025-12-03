@@ -1,0 +1,28 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+
+# Editor files
+.vscode/
+*.sublime-workspace
+*.sublime-project
+.DS_Store
+
+# Database
+backend/instance/pos.db
+
+# Logs
+*.log
+backend/server.log
+
+# Node
+node_modules/
+
+# OS
+Thumbs.db
