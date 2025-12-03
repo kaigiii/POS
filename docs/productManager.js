@@ -1,4 +1,4 @@
-const API_URL = 'http://127.0.0.1:5001/api';
+const API_URL = (window.__API_URL__ || 'http://127.0.0.1:5001') + '/api';
 
 function showToast(message, type = 'default', timeout = 3500) {
     const container = document.getElementById('toastContainer');
