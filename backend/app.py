@@ -1,306 +1,281 @@
 
-from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_cors import CORS
+from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 import os
-from config import Config
-from datetime import datetime, timedelta
 import random
+from datetime import datetime, timedelta
 
-db = SQLAlchemy()
+from db import SessionLocal, init_db
+from models import Product, Transaction, TransactionItem
 
-class Product(db.Model):
-	id = db.Column(db.Integer, primary_key=True)
-	name = db.Column(db.String(128), unique=True, nullable=False)
-	price = db.Column(db.Float, nullable=False)
-	cost = db.Column(db.Float, nullable=False)
-	stock = db.Column(db.Integer, default=0, nullable=False)
+from pydantic import BaseModel
 
-class Transaction(db.Model):
-	id = db.Column(db.Integer, primary_key=True)
-	timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-	total_amount = db.Column(db.Float, nullable=False)
-	items = db.relationship('TransactionItem', backref='transaction', lazy=True)
+# simple utility and config
+ALLOW_DESTRUCTIVE = str(os.environ.get('ALLOW_DESTRUCTIVE', 'false')).lower() in ('1', 'true', 'yes')
+ADMIN_KEY = os.environ.get('ADMIN_KEY')
 
-class TransactionItem(db.Model):
-	id = db.Column(db.Integer, primary_key=True)
-	transaction_id = db.Column(db.Integer, db.ForeignKey('transaction.id'), nullable=False)
-	product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
-	quantity = db.Column(db.Integer, nullable=False)
-	price_at_sale = db.Column(db.Float, nullable=False)
+app = FastAPI()
 
-def create_app():
-	app = Flask(__name__)
-	app.config.from_object(Config)
-	db.init_app(app)
-	# Configure CORS; by default allow all (adjust in production if needed)
-	CORS(app)
+# Allow CORS from anywhere (match previous behavior)
+app.add_middleware(
+	CORSMiddleware,
+	allow_origins=["*"],
+	allow_credentials=True,
+	allow_methods=["*"],
+	allow_headers=["*"],
+)
 
-	# destructive actions (reset/init) should be explicitly enabled in production
-	# set ALLOW_DESTRUCTIVE=1 or 'true' in environment to allow these endpoints
-	# For developer convenience: also allow when Flask is running in debug mode
-	allow_destructive_env = str(os.environ.get('ALLOW_DESTRUCTIVE', 'false')).lower() in ('1', 'true', 'yes')
-	# Allow destructive actions in development or when explicitly enabled.
-	flask_debug_env = str(os.environ.get('FLASK_DEBUG', 'false')).lower() in ('1', 'true', 'yes')
-	flask_env_is_dev = str(os.environ.get('FLASK_ENV', '')).lower() == 'development'
-	allow_destructive = allow_destructive_env or flask_debug_env or flask_env_is_dev or app.debug
-	# optional admin key: if set, endpoints require header X-ADMIN-KEY to match
-	admin_key = os.environ.get('ADMIN_KEY')
-	@app.route('/api/products', methods=['GET'])
-	def get_products():
-		products = Product.query.all()
-		result = [
-			{
-				'id': p.id,
-				'name': p.name,
-				'price': p.price,
-				'cost': p.cost,
-				'stock': p.stock
-			} for p in products
-		]
-		return jsonify(result)
 
-	@app.route('/health', methods=['GET'])
-	def health():
-		return jsonify({'status': 'ok'}), 200
+class ProductCreate(BaseModel):
+	name: str
+	price: float
+	cost: float
+	stock: int = 0
 
-	@app.route('/api/products', methods=['POST'])
-	def add_product():
-		data = request.get_json()
-		product = Product(
-			name=data['name'],
-			price=data['price'],
-			cost=data['cost'],
-			stock=data.get('stock', 0)
-		)
-		db.session.add(product)
-		db.session.commit()
-		return jsonify({'message': 'Product added', 'id': product.id}), 201
 
-	@app.route('/api/products/<int:product_id>', methods=['GET'])
-	def get_product(product_id):
-		product = Product.query.get(product_id)
-		if not product:
-			return jsonify({'error': 'Product not found'}), 404
-		return jsonify({
-			'id': product.id,
-			'name': product.name,
-			'price': product.price,
-			'cost': product.cost,
-			'stock': product.stock
-		})
+class ProductUpdate(BaseModel):
+	name: str | None = None
+	price: float | None = None
+	cost: float | None = None
+	stock: int | None = None
 
-	@app.route('/api/products/<int:product_id>', methods=['PUT'])
-	def update_product(product_id):
-		product = Product.query.get(product_id)
-		if not product:
-			return jsonify({'error': 'Product not found'}), 404
-		data = request.get_json()
-		product.name = data.get('name', product.name)
-		product.price = data.get('price', product.price)
-		product.cost = data.get('cost', product.cost)
-		product.stock = data.get('stock', product.stock)
-		db.session.commit()
-		return jsonify({'message': 'Product updated'})
 
-	@app.route('/api/products/<int:product_id>', methods=['DELETE'])
-	def delete_product(product_id):
-		product = Product.query.get(product_id)
-		if not product:
-			return jsonify({'error': 'Product not found'}), 404
-		db.session.delete(product)
-		db.session.commit()
-		return jsonify({'message': 'Product deleted'})
-	@app.route('/api/checkout', methods=['POST'])
-	def checkout():
-		cart = request.get_json()
-		if not isinstance(cart, list):
-			return jsonify({'error': 'Invalid cart format'}), 400
-		try:
-			with db.session.begin():
-				total = 0
-				items = []
-				for entry in cart:
-					product = Product.query.get(entry['product_id'])
-					if not product or product.stock < entry['quantity']:
-						db.session.rollback()
-						return jsonify({'error': f"Product {entry['product_id']} 庫存不足或不存在"}), 400
-					total += product.price * entry['quantity']
-					items.append((product, entry['quantity'], product.price))
-				transaction = Transaction(total_amount=total)
-				db.session.add(transaction)
-				db.session.flush()  # 取得 transaction.id
-				for product, qty, price in items:
-					ti = TransactionItem(
-						transaction_id=transaction.id,
-						product_id=product.id,
-						quantity=qty,
-						price_at_sale=price
-					)
-					db.session.add(ti)
-					product.stock -= qty
-				db.session.commit()
-			return jsonify({'message': 'Checkout success', 'transaction_id': transaction.id}), 201
-		except Exception as e:
-			db.session.rollback()
-			return jsonify({'error': str(e)}), 500
-	@app.route('/api/transactions', methods=['GET'])
-	def get_transactions():
-		transactions = Transaction.query.order_by(Transaction.timestamp.desc()).all()
-		result = [
-			{
-				'id': t.id,
-				'timestamp': t.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-				'total_amount': t.total_amount
-			} for t in transactions
-		]
-		return jsonify(result)
+class CartItem(BaseModel):
+	product_id: int
+	quantity: int
 
-	@app.route('/api/transactions/<int:transaction_id>', methods=['GET'])
-	def get_transaction_detail(transaction_id):
-		t = Transaction.query.get(transaction_id)
-		if not t:
-			return jsonify({'error': 'Transaction not found'}), 404
-		items = [
-			{
-				'id': i.id,
-				'product_id': i.product_id,
-				'quantity': i.quantity,
-				'price_at_sale': i.price_at_sale
-			} for i in t.items
-		]
-		return jsonify({
-			'id': t.id,
-			'timestamp': t.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-			'total_amount': t.total_amount,
-			'items': items
-		})
 
-	# 管理: 重設範例資料（清除並重新建立 products + transactions）
-	# NOTE: 為了簡單作業目的，此 endpoint 不再做管理員驗證，前端可直接呼叫（開發/教學用途）。
-	@app.route('/api/reset_seed', methods=['POST'])
-	def reset_seed():
-		try:
-			# remove children first
-			TransactionItem.query.delete()
-			Transaction.query.delete()
-			Product.query.delete()
-			db.session.commit()
-		except Exception:
-			db.session.rollback()
+def get_db():
+	db = SessionLocal()
+	try:
+		yield db
+	finally:
+		db.close()
 
-		# sample product names
+
+@app.on_event('startup')
+def on_startup():
+	# ensure tables exist
+	init_db()
+
+
+@app.get('/health')
+def health():
+	return {'status': 'ok'}
+
+
+@app.get('/api/products')
+def get_products(db: Session = Depends(get_db)):
+	products = db.query(Product).all()
+	return [
+		{'id': p.id, 'name': p.name, 'price': p.price, 'cost': p.cost, 'stock': p.stock}
+		for p in products
+	]
+
+
+@app.post('/api/products', status_code=201)
+def add_product(payload: ProductCreate, db: Session = Depends(get_db)):
+	p = Product(name=payload.name, price=payload.price, cost=payload.cost, stock=payload.stock)
+	db.add(p)
+	db.commit()
+	db.refresh(p)
+	return {'message': 'Product added', 'id': p.id}
+
+
+@app.get('/api/products/{product_id}')
+def get_product(product_id: int, db: Session = Depends(get_db)):
+	p = db.get(Product, product_id)
+	if not p:
+		raise HTTPException(status_code=404, detail='Product not found')
+	return {'id': p.id, 'name': p.name, 'price': p.price, 'cost': p.cost, 'stock': p.stock}
+
+
+@app.put('/api/products/{product_id}')
+def update_product(product_id: int, payload: ProductUpdate, db: Session = Depends(get_db)):
+	p = db.get(Product, product_id)
+	if not p:
+		raise HTTPException(status_code=404, detail='Product not found')
+	if payload.name is not None:
+		p.name = payload.name
+	if payload.price is not None:
+		p.price = payload.price
+	if payload.cost is not None:
+		p.cost = payload.cost
+	if payload.stock is not None:
+		p.stock = payload.stock
+	db.commit()
+	return {'message': 'Product updated'}
+
+
+@app.delete('/api/products/{product_id}')
+def delete_product(product_id: int, db: Session = Depends(get_db)):
+	p = db.get(Product, product_id)
+	if not p:
+		raise HTTPException(status_code=404, detail='Product not found')
+	db.delete(p)
+	db.commit()
+	return {'message': 'Product deleted'}
+
+
+@app.post('/api/checkout', status_code=201)
+def checkout(cart: list[CartItem], db: Session = Depends(get_db)):
+	if not isinstance(cart, list):
+		raise HTTPException(status_code=400, detail='Invalid cart format')
+	try:
+		with db.begin():
+			total = 0
+			items = []
+			for entry in cart:
+				product = db.get(Product, entry.product_id)
+				if not product or product.stock < entry.quantity:
+					raise HTTPException(status_code=400, detail=f"Product {entry.product_id} 庫存不足或不存在")
+				total += product.price * entry.quantity
+				items.append((product, entry.quantity, product.price))
+			tx = Transaction(total_amount=total, timestamp=datetime.utcnow())
+			db.add(tx)
+			db.flush()
+			for product, qty, price in items:
+				ti = TransactionItem(transaction_id=tx.id, product_id=product.id, quantity=qty, price_at_sale=price)
+				db.add(ti)
+				product.stock -= qty
+		return {'message': 'Checkout success', 'transaction_id': tx.id}
+	except HTTPException:
+		raise
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get('/api/transactions')
+def get_transactions(db: Session = Depends(get_db)):
+	txs = db.query(Transaction).order_by(Transaction.timestamp.desc()).all()
+	return [
+		{'id': t.id, 'timestamp': t.timestamp.strftime('%Y-%m-%d %H:%M:%S'), 'total_amount': t.total_amount}
+		for t in txs
+	]
+
+
+@app.get('/api/transactions/{transaction_id}')
+def get_transaction_detail(transaction_id: int, db: Session = Depends(get_db)):
+	t = db.get(Transaction, transaction_id)
+	if not t:
+		raise HTTPException(status_code=404, detail='Transaction not found')
+	items = [
+		{'id': i.id, 'product_id': i.product_id, 'quantity': i.quantity, 'price_at_sale': i.price_at_sale}
+		for i in t.items
+	]
+	return {'id': t.id, 'timestamp': t.timestamp.strftime('%Y-%m-%d %H:%M:%S'), 'total_amount': t.total_amount, 'items': items}
+
+
+def _check_destructive(request: Request):
+	# allow if ALLOW_DESTRUCTIVE or correct ADMIN_KEY header
+	if ALLOW_DESTRUCTIVE:
+		return True
+	if ADMIN_KEY:
+		header = request.headers.get('X-ADMIN-KEY')
+		return header == ADMIN_KEY
+	return False
+
+
+@app.post('/api/reset_seed')
+def reset_seed(request: Request, db: Session = Depends(get_db)):
+	# Public: allow frontend (or any caller) to recreate sample data
+	try:
+		with db.begin():
+			db.query(TransactionItem).delete()
+			db.query(Transaction).delete()
+			db.query(Product).delete()
+
 		PRODUCT_NAMES = [
 			'Espresso', 'Latte', 'Cappuccino', 'Tea', 'Orange Juice', 'Muffin', 'Bagel', 'Sandwich',
 			'Chocolate', 'Soda', 'Water', 'Cookie', 'Salad', 'Burger', 'Fries', 'Milk', 'Yogurt', 'Granola', 'Apple', 'Banana'
 		]
-		# create products
 		created = 0
 		for name in PRODUCT_NAMES:
-			p = Product(name=name,
-					price=round(random.uniform(0.5, 10.0), 2),
-					cost=round(random.uniform(0.2, 5.0), 2),
-					stock=random.randint(10, 200))
-			db.session.add(p)
+			p = Product(name=name, price=round(random.uniform(0.5, 10.0), 2), cost=round(random.uniform(0.2, 5.0), 2), stock=random.randint(10, 200))
+			db.add(p)
 			created += 1
-		db.session.commit()
+		db.commit()
 
-		# create random transactions
 		tx_count = 50
 		created_tx = 0
-		products = Product.query.all()
+		products = db.query(Product).all()
 		if products:
-			for i in range(tx_count):
+			for _ in range(tx_count):
 				items = []
-				for _ in range(random.randint(1, 4)):
+				for __ in range(random.randint(1, 4)):
 					p = random.choice(products)
 					qty = random.randint(1, 5)
 					items.append((p, qty))
 				total = sum(p.price * q for p, q in items)
 				t = Transaction(timestamp=datetime.utcnow() - timedelta(days=random.randint(0, 30)), total_amount=round(total, 2))
-				db.session.add(t)
-				db.session.flush()
+				db.add(t)
+				db.flush()
 				for p, q in items:
 					ti = TransactionItem(transaction_id=t.id, product_id=p.id, quantity=q, price_at_sale=p.price)
-					db.session.add(ti)
+					db.add(ti)
 					p.stock = max(0, p.stock - q)
 				created_tx += 1
-			db.session.commit()
+			db.commit()
 
-		return jsonify({'message': 'reset complete', 'products_created': created, 'transactions_created': created_tx})
+		return {'message': 'reset complete', 'products_created': created, 'transactions_created': created_tx}
+	except Exception as e:
+		db.rollback()
+		raise HTTPException(status_code=500, detail=str(e))
 
-	@app.route('/api/init_db', methods=['POST'])
-	def init_db_endpoint():
-		# Create tables and optionally seed minimal products (for first-time setup)
-		# NOTE: 為了簡單作業目的，此 endpoint 不再做管理員驗證，前端可直接呼叫（開發/教學用途）。
-		# Combined behavior: ensure tables exist, then remove existing data and seed sample products + transactions
-		try:
-			with app.app_context():
-				# ensure tables
-				db.create_all()
-				# destructive: clear existing data
-				try:
-					TransactionItem.query.delete()
-					Transaction.query.delete()
-					Product.query.delete()
-					db.session.commit()
-				except Exception:
-					db.session.rollback()
 
-				# sample product names
-				PRODUCT_NAMES = [
-					'Espresso', 'Latte', 'Cappuccino', 'Tea', 'Orange Juice', 'Muffin', 'Bagel', 'Sandwich',
-					'Chocolate', 'Soda', 'Water', 'Cookie', 'Salad', 'Burger', 'Fries', 'Milk', 'Yogurt', 'Granola', 'Apple', 'Banana'
-				]
+@app.post('/api/init_db', status_code=201)
+def init_db_endpoint(request: Request, db: Session = Depends(get_db)):
+	# Public: allow frontend (or any caller) to initialize & seed the DB
+	try:
+		# ensure tables
+		init_db()
+		# clear & seed
+		with db.begin():
+			db.query(TransactionItem).delete()
+			db.query(Transaction).delete()
+			db.query(Product).delete()
 
-				created = 0
-				products = []
-				for name in PRODUCT_NAMES:
-					p = Product(name=name,
-							price=round(random.uniform(0.5, 10.0), 2),
-							cost=round(random.uniform(0.2, 5.0), 2),
-							stock=random.randint(10, 200))
-					db.session.add(p)
-					products.append(p)
-					created += 1
-				db.session.commit()
+		PRODUCT_NAMES = [
+			'Espresso', 'Latte', 'Cappuccino', 'Tea', 'Orange Juice', 'Muffin', 'Bagel', 'Sandwich',
+			'Chocolate', 'Soda', 'Water', 'Cookie', 'Salad', 'Burger', 'Fries', 'Milk', 'Yogurt', 'Granola', 'Apple', 'Banana'
+		]
+		created = 0
+		for name in PRODUCT_NAMES:
+			p = Product(name=name, price=round(random.uniform(0.5, 10.0), 2), cost=round(random.uniform(0.2, 5.0), 2), stock=random.randint(10, 200))
+			db.add(p)
+			created += 1
+		db.commit()
 
-				# create random transactions
-				tx_count = 50
-				created_tx = 0
-				if products:
-					products = Product.query.all()
-					for i in range(tx_count):
-						items = []
-						for _ in range(random.randint(1, 4)):
-							p = random.choice(products)
-							qty = random.randint(1, 5)
-							items.append((p, qty))
-						total = sum(p.price * q for p, q in items)
-						t = Transaction(timestamp=datetime.utcnow() - timedelta(days=random.randint(0, 30)), total_amount=round(total, 2))
-						db.session.add(t)
-						db.session.flush()
-						for p, q in items:
-							ti = TransactionItem(transaction_id=t.id, product_id=p.id, quantity=q, price_at_sale=p.price)
-							db.session.add(ti)
-							p.stock = max(0, p.stock - q)
-						created_tx += 1
-					db.session.commit()
+		tx_count = 50
+		created_tx = 0
+		products = db.query(Product).all()
+		if products:
+			for _ in range(tx_count):
+				items = []
+				for __ in range(random.randint(1, 4)):
+					p = random.choice(products)
+					qty = random.randint(1, 5)
+					items.append((p, qty))
+				total = sum(p.price * q for p, q in items)
+				t = Transaction(timestamp=datetime.utcnow() - timedelta(days=random.randint(0, 30)), total_amount=round(total, 2))
+				db.add(t)
+				db.flush()
+				for p, q in items:
+					ti = TransactionItem(transaction_id=t.id, product_id=p.id, quantity=q, price_at_sale=p.price)
+					db.add(ti)
+					p.stock = max(0, p.stock - q)
+				created_tx += 1
+			db.commit()
 
-				return jsonify({'message': 'setup complete', 'products_created': created, 'transactions_created': created_tx}), 201
-		except Exception as e:
-			db.session.rollback()
-			return jsonify({'error': str(e)}), 500
-	return app
+		return {'message': 'setup complete', 'products_created': created, 'transactions_created': created_tx}
+	except Exception as e:
+		db.rollback()
+		raise HTTPException(status_code=500, detail=str(e))
 
-# 初始化資料庫
+
 if __name__ == '__main__':
-	app = create_app()
-	if not os.path.exists('pos.db'):
-		with app.app_context():
-			db.create_all()
-	# Allow overriding port and debug via environment for flexible local testing
+	import uvicorn
 	port = int(os.environ.get('PORT', '5001'))
-	debug_env = str(os.environ.get('FLASK_DEBUG', 'true')).lower()
-	debug_mode = debug_env in ('1', 'true', 'yes')
-	app.run(host='127.0.0.1', port=port, debug=debug_mode)
+	uvicorn.run('app:app', host='127.0.0.1', port=port, reload=True)
+

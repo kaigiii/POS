@@ -92,7 +92,7 @@
 		</div>
 	</div>
 	<div class="toast-container" id="toastContainer" aria-live="polite"></div>
-	<script>window.__API_URL__ = 'https://pos-lb9c.onrender.com/api';</script>
+	<script>window.__API_URL__ = 'https://pos-lb9c.onrender.com';</script>
 	<script src="productManager.js"></script>
 	<script>
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -109,17 +109,44 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		fetch(initUrl, { method: 'POST' })
 			.then(initRes => {
 				console.log('[products] init status:', initRes.status);
+				if(!initRes.ok) {
+					return initRes.text().then(text => {
+						console.error('[products] init failed body:', text);
+						throw new Error(`Init failed: ${initRes.status}`);
+					});
+				}
+				return initRes.json();
+			})
+			.then(initData => {
+				console.log('[products] init response:', initData);
+				console.log('[products] calling reset:', resetUrl);
 				return fetch(resetUrl, { method: 'POST' });
 			})
 			.then(async r => {
 				console.log('[products] reset status:', r.status);
+				if(!r.ok){ 
+					const err = await r.text().catch(()=>'<no-body>'); 
+					console.error('[products] reset body:', err); 
+					throw new Error('重設失敗'); 
+				}
+				try{ 
+					const data = await r.json(); 
+					console.log('[products] reset body:', data);
+				} catch(e) {
+					console.error('[products] parse json error:', e);
+				}
 				btn.disabled = false;
-				if(!r.ok){ const err = await r.text().catch(()=>'<no-body>'); console.error('[products] reset body:', err); throw new Error('重設失敗'); }
-				try{ const data = await r.json(); console.log('[products] reset body:', data);}catch(e){}
 				if(typeof showToast === 'function') showToast('已初始化並重設範例資料', 'success');
 				else alert('已初始化並重設範例資料');
 				setTimeout(()=> location.reload(), 700);
-			}).catch(err=>{ console.error('[products] error:', err); btn.disabled = false; if(typeof showToast === 'function') showToast('初始化或重設失敗','error'); else alert('初始化或重設失敗'); });
+			})
+			.catch(err => { 
+				console.error('[products] error:', err); 
+				console.error('[products] error stack:', err.stack);
+				btn.disabled = false; 
+				if(typeof showToast === 'function') showToast('初始化或重設失敗: ' + err.message, 'error'); 
+				else alert('初始化或重設失敗: ' + err.message); 
+			});
 	});
 });
 </script>
