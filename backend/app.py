@@ -55,6 +55,10 @@ def create_app():
 		]
 		return jsonify(result)
 
+	@app.route('/health', methods=['GET'])
+	def health():
+		return jsonify({'status': 'ok'}), 200
+
 	@app.route('/api/products', methods=['POST'])
 	def add_product():
 		data = request.get_json()
