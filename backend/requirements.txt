@@ -6,4 +6,4 @@ python-dotenv==1.0.1
 gunicorn==23.0.0
 
 # Postgres driver for production (Render managed Postgres)
-psycopg[binary]
+psycopg2-binary
