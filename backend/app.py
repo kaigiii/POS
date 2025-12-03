@@ -39,6 +39,8 @@ def create_app():
 	# destructive actions (reset/init) should be explicitly enabled in production
 	# set ALLOW_DESTRUCTIVE=1 or 'true' in environment to allow these endpoints
 	allow_destructive = str(os.environ.get('ALLOW_DESTRUCTIVE', 'false')).lower() in ('1', 'true', 'yes')
+	# optional admin key: if set, endpoints require header X-ADMIN-KEY to match
+	admin_key = os.environ.get('ADMIN_KEY')
 	@app.route('/api/products', methods=['GET'])
 	def get_products():
 		products = Product.query.all()
@@ -168,9 +170,14 @@ def create_app():
 	# 管理: 重設範例資料（清除並重新建立 products + transactions）
 	@app.route('/api/reset_seed', methods=['POST'])
 	def reset_seed():
-		# NOTE: this endpoint is destructive; only enabled if ALLOW_DESTRUCTIVE env var is set
-		if not allow_destructive and os.environ.get('FLASK_ENV') != 'development':
-			return jsonify({'error': 'destructive endpoints are disabled'}), 403
+		# NOTE: this endpoint is destructive; protected by ADMIN_KEY if present, otherwise by ALLOW_DESTRUCTIVE
+		if admin_key:
+			provided = request.headers.get('X-ADMIN-KEY')
+			if not provided or provided != admin_key:
+				return jsonify({'error': 'forbidden (invalid admin key)'}), 403
+		else:
+			if not allow_destructive and os.environ.get('FLASK_ENV') != 'development':
+				return jsonify({'error': 'destructive endpoints are disabled'}), 403
 		try:
 			# remove children first
 			TransactionItem.query.delete()
@@ -223,8 +230,13 @@ def create_app():
 	@app.route('/api/init_db', methods=['POST'])
 	def init_db_endpoint():
 		# Create tables and optionally seed minimal products (for first-time setup)
-		if not allow_destructive and os.environ.get('FLASK_ENV') != 'development':
-			return jsonify({'error': 'destructive endpoints are disabled'}), 403
+		if admin_key:
+			provided = request.headers.get('X-ADMIN-KEY')
+			if not provided or provided != admin_key:
+				return jsonify({'error': 'forbidden (invalid admin key)'}), 403
+		else:
+			if not allow_destructive and os.environ.get('FLASK_ENV') != 'development':
+				return jsonify({'error': 'destructive endpoints are disabled'}), 403
 		try:
 			with app.app_context():
 				db.create_all()
