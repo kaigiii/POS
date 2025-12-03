@@ -1,5 +1,6 @@
 
 from fastapi import FastAPI, Depends, HTTPException, Request
+from sqlalchemy.exc import IntegrityError
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import os
@@ -118,9 +119,17 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
 	p = db.get(Product, product_id)
 	if not p:
 		raise HTTPException(status_code=404, detail='Product not found')
-	db.delete(p)
-	db.commit()
-	return {'message': 'Product deleted'}
+	try:
+		db.delete(p)
+		db.commit()
+		return {'message': 'Product deleted'}
+	except IntegrityError:
+		db.rollback()
+		# Likely referenced by transactions / FK constraint in some DB backends
+		raise HTTPException(status_code=400, detail='Cannot delete product: it is referenced by transactions')
+	except Exception as e:
+		db.rollback()
+		raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post('/api/checkout', status_code=201)
