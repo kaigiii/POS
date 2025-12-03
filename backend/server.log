@@ -1,19 +1,5 @@
- * Serving Flask app 'app'
- * Debug mode: on
-[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
- * Running on http://127.0.0.1:5001
-[33mPress CTRL+C to quit[0m
- * Restarting with stat
- * Debugger is active!
- * Debugger PIN: 443-314-793
-Traceback (most recent call last):
-  File "/Users/xiaojunjun/Desktop/POS/backend/app.py", line 223, in <module>
-    app.run(host='127.0.0.1', port=5001, debug=True)
-  File "/Users/xiaojunjun/.pyenv    ^^^^^^^^^^^^^^
-  File "/Users/xiaojunjun/.pyenv/versions/3.11.9/lib/python    run_simple(t.cast(str, host), port, self, **opt    run_simple(t.cast(str, host), port, self, **options)
-  File "/Users/xiaojunjun/.pyenv/versions/3.11.9/lib/python3.11/site-packa    run_with_reloader(
-  File "/Users/xiaojunjun/.pyenv/versions/3.11.9/lib/python3.11/site-packages/werkzeug/_reloader.py", line 459, in run_with_reloader
-    ensure_echo_on()
-  File "/Users/xiaojunjun/.pye    ensure_echo_on()
-  File "/Users/xiaojunjun/.pyenv/versions/3.11.9/lib/python3.11/site-packages/w    termios.tcsetattr(sys.stdin, termios.TCSANOW, a    termios.tcsetattr(sys.stdin, termios.TCSANOW, attributes)
-termios.error: (4, 'Interrupted system call')
+[2025-12-03 14:01:35 +0800] [26839] [INFO] Starting gunicorn 22.0.0
+[2025-12-03 14:01:35 +0800] [26839] [INFO] Listening at: http://127.0.0.1:5001 (26839)
+[2025-12-03 14:01:35 +0800] [26839] [INFO] Using worker: sync
+[2025-12-03 14:01:35 +0800] [26882] [INFO] Booting worker with pid: 26882
+[2025-12-03 14:01:35 +0800] [26883] [INFO] Booting worker with pid: 26883

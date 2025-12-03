@@ -12,6 +12,7 @@
   - `pos.db` - SQLite 資料庫（若有）
   - `requirements.txt` - Python 相依套件
 - `frontend/`
+ - `docs/` (GitHub Pages 預設來源)
   - `index.html` - 銷售頁 (POS)
   - `products.html` - 產品管理頁
   - `transactions.html` - 交易紀錄頁
@@ -76,7 +77,7 @@ curl -i -X POST http://127.0.0.1:5001/api/reset_seed
 - `POST /api/reset_seed` - 重設並建立範例資料（開發 / 本機用途，會清除資料）
 
 前端（快速預覽）
-- 直接以瀏覽器打開 `frontend/index.html`、`frontend/products.html` 或 `frontend/transactions.html` 即可（開發時以 `file://` 觀看或以簡單靜態伺服器）。
+- 直接以瀏覽器打開 `docs/index.html`、`docs/products.html` 或 `docs/transactions.html` 即可（開發時以 `file://` 觀看或以簡單靜態伺服器）。
 - 若前端與後端不在同一 host:port，請確認後端 CORS 設定允許來源（目前後端啟用 CORS *）。
 
 部署提示
@@ -87,7 +88,7 @@ curl -i -X POST http://127.0.0.1:5001/api/reset_seed
 - 在本機使用虛擬環境測試套件與執行環境整合。
 - 若要自動化測試，可撰寫 pytest 測試對 `app.create_app()` 做工廠建立並使用 sqlite in-memory 測試資料庫。
 
-若要我代勞
+- 若要我代勞
 - 幫你跑一次 `seed_fake_data.py` 並把結果與伺服器狀態回報。
 - 或將前端改為以簡單 `http-server` 或 Flask static serve 提供，方便在瀏覽器做跨-origin 測試。
 

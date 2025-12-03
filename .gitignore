@@ -24,5 +24,8 @@ backend/server.log
 # Node
 node_modules/
 
+# Ignore duplicate frontend folder (we keep `docs/` for Pages)
+frontend/
+
 # OS
 Thumbs.db

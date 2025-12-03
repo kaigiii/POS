@@ -212,6 +212,26 @@ def create_app():
 			db.session.commit()
 
 		return jsonify({'message': 'reset complete', 'products_created': created, 'transactions_created': created_tx})
+
+	@app.route('/api/init_db', methods=['POST'])
+	def init_db_endpoint():
+		# Create tables and optionally seed minimal products (for first-time setup)
+		try:
+			with app.app_context():
+				db.create_all()
+				count = Product.query.count()
+				if count == 0:
+					p1 = Product(name='Apple', price=0.5, cost=0.3, stock=100)
+					p2 = Product(name='Banana', price=0.3, cost=0.1, stock=150)
+					p3 = Product(name='Coffee', price=2.5, cost=1.0, stock=50)
+					db.session.add_all([p1, p2, p3])
+					db.session.commit()
+					return jsonify({'message': 'initialized and seeded 3 products'}), 201
+				else:
+					return jsonify({'message': f'already initialized ({count} products)'}), 200
+		except Exception as e:
+			db.session.rollback()
+			return jsonify({'error': str(e)}), 500
 	return app
 
 # 初始化資料庫
