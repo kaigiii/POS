@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>POS 系統</title>
+	<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+	<div class="container">
+		<div class="navbar">
+			<div class="brand">
+				<div class="logo">POS</div>
+				<div class="brand-text">
+					<div class="brand-title">POS 系統</div>
+					<div class="brand-sub">快速結帳</div>
+				</div>
+			</div>
+			<div class="nav-links">
+				<a href="index.html" class="active">銷售頁</a>
+				<a href="transactions.html">交易記錄</a>
+				<a href="products.html">產品管理</a>
+				<button id="resetSeedBtn" class="action-btn" style="margin-left:12px">重設範例資料</button>
+			</div>
+		</div>
+
+		<div class="card" style="display:grid;grid-template-columns:1fr 360px;gap:18px;align-items:start">
+			<!-- Left: product browser -->
+			<section id="productBrowser">
+				<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+					<input type="text" id="productSearch" placeholder="搜尋或輸入條碼/名稱，按 Enter 直接加入">
+					<div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+						<button id="openAllBtn" class="btn ghost" style="padding:8px 10px">全部商品</button>
+						<div class="muted" style="font-size:13px">快速鍵：Enter (加入)、/ (聚焦搜尋)</div>
+					</div>
+				</div>
+
+				<div id="searchSuggestions" style="margin-top:10px"></div>
+
+				<div id="productPanel" class="product-grid" style="margin-top:14px"></div>
+			</section>
+
+			<!-- Right: cart panel -->
+			<aside id="cartPanel" style="position:sticky;top:20px">
+				<div style="display:flex;justify-content:space-between;align-items:center">
+					<h2 style="margin:0">購物車</h2>
+					<div class="muted" id="cartCount">0 件</div>
+				</div>
+				<div class="card" style="margin-top:12px;padding:12px;">
+					<div id="cartItems"></div>
+					<div id="totalDisplay" style="margin-top:12px;font-size:18px;font-weight:700">總金額：0</div>
+					<div style="display:flex;gap:8px;margin-top:12px">
+						<button id="checkoutBtn" class="btn" style="flex:1">結帳</button>
+						<button id="clearCartBtn" class="btn ghost" style="flex:0">清空</button>
+					</div>
+					<div id="message" class="message"></div>
+				</div>
+			</aside>
+		</div>
+	</div>
+
+	<!-- Checkout modal -->
+	<div id="checkoutModal" class="modal-backdrop" style="display:none">
+		<div class="modal">
+			<button class="close-btn" id="closeCheckout">✕</button>
+			<h2>結帳</h2>
+			<div id="checkoutSummary"></div>
+			<div style="display:flex;gap:8px;margin-top:12px">
+				<button id="confirmCheckout" class="btn">確認付款</button>
+				<button id="cancelCheckout" class="btn ghost">取消</button>
+			</div>
+		</div>
+	</div>
+
+	<div class="toast-container" id="toastContainer" aria-live="polite"></div>
+	<script src="posLogic.js"></script>
+
+	<script>
+document.addEventListener('DOMContentLoaded', ()=>{
+	const btn = document.getElementById('resetSeedBtn');
+	if(!btn) return;
+	btn.addEventListener('click', ()=>{
+		if(!confirm('確定要清除並重新建立範例資料嗎？這會刪除所有交易與產品資料。')) return;
+		btn.disabled = true;
+		fetch('http://127.0.0.1:5001/api/reset_seed', { method: 'POST' })
+			.then(async r => {
+				btn.disabled = false;
+				if(!r.ok) throw new Error('重設失敗');
+				try{ const data = await r.json(); }catch(e){}
+				if(typeof showToast === 'function') showToast('已重設範例資料', 'success');
+				else alert('已重設範例資料');
+				setTimeout(()=> location.reload(), 700);
+			}).catch(()=>{ btn.disabled = false; if(typeof showToast === 'function') showToast('重設失敗','error'); else alert('重設失敗'); });
+	});
+});
+</script>
+	</div>
+</body>
+</html>
