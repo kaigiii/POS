@@ -38,7 +38,9 @@ def create_app():
 
 	# destructive actions (reset/init) should be explicitly enabled in production
 	# set ALLOW_DESTRUCTIVE=1 or 'true' in environment to allow these endpoints
-	allow_destructive = str(os.environ.get('ALLOW_DESTRUCTIVE', 'false')).lower() in ('1', 'true', 'yes')
+	# For developer convenience: also allow when Flask is running in debug mode
+	allow_destructive_env = str(os.environ.get('ALLOW_DESTRUCTIVE', 'false')).lower() in ('1', 'true', 'yes')
+	allow_destructive = allow_destructive_env or app.debug
 	# optional admin key: if set, endpoints require header X-ADMIN-KEY to match
 	admin_key = os.environ.get('ADMIN_KEY')
 	@app.route('/api/products', methods=['GET'])
@@ -241,19 +243,61 @@ def create_app():
 		else:
 			if not allow_destructive and os.environ.get('FLASK_ENV') != 'development':
 				return jsonify({'error': 'destructive endpoints are disabled'}), 403
+		# Combined behavior: ensure tables exist, then remove existing data and seed sample products + transactions
 		try:
 			with app.app_context():
+				# ensure tables
 				db.create_all()
-				count = Product.query.count()
-				if count == 0:
-					p1 = Product(name='Apple', price=0.5, cost=0.3, stock=100)
-					p2 = Product(name='Banana', price=0.3, cost=0.1, stock=150)
-					p3 = Product(name='Coffee', price=2.5, cost=1.0, stock=50)
-					db.session.add_all([p1, p2, p3])
+				# destructive: clear existing data
+				try:
+					TransactionItem.query.delete()
+					Transaction.query.delete()
+					Product.query.delete()
 					db.session.commit()
-					return jsonify({'message': 'initialized and seeded 3 products'}), 201
-				else:
-					return jsonify({'message': f'already initialized ({count} products)'}), 200
+				except Exception:
+					db.session.rollback()
+
+				# sample product names
+				PRODUCT_NAMES = [
+					'Espresso', 'Latte', 'Cappuccino', 'Tea', 'Orange Juice', 'Muffin', 'Bagel', 'Sandwich',
+					'Chocolate', 'Soda', 'Water', 'Cookie', 'Salad', 'Burger', 'Fries', 'Milk', 'Yogurt', 'Granola', 'Apple', 'Banana'
+				]
+
+				created = 0
+				products = []
+				for name in PRODUCT_NAMES:
+					p = Product(name=name,
+							price=round(random.uniform(0.5, 10.0), 2),
+							cost=round(random.uniform(0.2, 5.0), 2),
+							stock=random.randint(10, 200))
+					db.session.add(p)
+					products.append(p)
+					created += 1
+				db.session.commit()
+
+				# create random transactions
+				tx_count = 50
+				created_tx = 0
+				if products:
+					products = Product.query.all()
+					for i in range(tx_count):
+						items = []
+						for _ in range(random.randint(1, 4)):
+							p = random.choice(products)
+							qty = random.randint(1, 5)
+							items.append((p, qty))
+						total = sum(p.price * q for p, q in items)
+						t = Transaction(timestamp=datetime.utcnow() - timedelta(days=random.randint(0, 30)), total_amount=round(total, 2))
+						db.session.add(t)
+						db.session.flush()
+						for p, q in items:
+							ti = TransactionItem(transaction_id=t.id, product_id=p.id, quantity=q, price_at_sale=p.price)
+							db.session.add(ti)
+							p.stock = max(0, p.stock - q)
+						created_tx += 1
+					db.session.commit()
+
+				return jsonify({'message': 'setup complete', 'products_created': created, 'transactions_created': created_tx}), 201
 		except Exception as e:
 			db.session.rollback()
 			return jsonify({'error': str(e)}), 500
@@ -265,5 +309,8 @@ if __name__ == '__main__':
 	if not os.path.exists('pos.db'):
 		with app.app_context():
 			db.create_all()
-	# 在本機開發時使用 127.0.0.1:5001，確保與前端預設 API_URL 相符
-	app.run(host='127.0.0.1', port=5001, debug=True)
+	# Allow overriding port and debug via environment for flexible local testing
+	port = int(os.environ.get('PORT', '5001'))
+	debug_env = str(os.environ.get('FLASK_DEBUG', 'true')).lower()
+	debug_mode = debug_env in ('1', 'true', 'yes')
+	app.run(host='127.0.0.1', port=port, debug=debug_mode)
