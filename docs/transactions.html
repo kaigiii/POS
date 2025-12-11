@@ -90,10 +90,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 btn.disabled = false;
                 if(!r.ok){ const err = await r.text().catch(()=>'<no-body>'); console.error('[transactions] reset body:', err); throw new Error('重設失敗'); }
                 try{ const data = await r.json(); console.log('[transactions] reset body:', data);}catch(e){}
-                if(typeof showToast === 'function') showToast('已初始化並重設範例資料', 'success');
-                else alert('已初始化並重設範例資料');
+                if(typeof showToast === 'function') showToast('已初始化並重設範例資料（此操作可能需要一些時間才能完成，請稍後刷新頁面）', 'success');
+                else alert('已初始化並重設範例資料。此操作可能需要一些時間才能完成，請稍後刷新頁面。');
                 setTimeout(()=> location.reload(), 700);
-            }).catch(err=>{ console.error('[transactions] error:', err); btn.disabled = false; if(typeof showToast === 'function') showToast('初始化或重設失敗','error'); else alert('初始化或重設失敗'); });
+            }).catch(err=>{ console.error('[transactions] error:', err); btn.disabled = false; if(typeof showToast === 'function') showToast('初始化或重設失敗（若為延遲造成，請稍後再試）','error'); else alert('初始化或重設失敗；若為延遲造成，請稍後再試'); });
     });
 });
 </script>
