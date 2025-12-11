@@ -33,19 +33,11 @@ jobs:
             echo "health check failed or timed out"
           fi
 
-          echo "Fetching /api/products..."
-          PROD_JSON=$(curl -fsS --max-time 15 "$RENDER_URL/api/products" || echo "null")
-          echo "Products response: ${PROD_JSON}"
-
-          if [ "$PROD_JSON" = "null" ] || [ "$PROD_JSON" = "[]" ]; then
-            echo "No products found; calling /api/init_db"
-            # call init_db with ADMIN header if provided
-            if curl -fsS -X POST "${HEADER_ARG[@]}" "$RENDER_URL/api/init_db"; then
-              echo "init_db triggered successfully"
-            else
-              echo "init_db failed"
-              exit 1
-            fi
+          echo "Calling /api/init_db unconditionally"
+          # call init_db with ADMIN header if provided
+          if curl -fsS -X POST "${HEADER_ARG[@]}" "$RENDER_URL/api/init_db"; then
+            echo "init_db triggered successfully"
           else
-            echo "Products present; nothing to do"
+            echo "init_db failed"
+            exit 1
           fi
