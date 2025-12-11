@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	if(!btn) return;
 	btn.addEventListener('click', ()=>{
 		console.log('[products] resetSeedBtn clicked');
-		if(!confirm('確定要清除並重新建立範例資料嗎？這會建立資料表（如尚未建立）並刪除所有交易與產品資料。')) return;
+		if(!confirm('確定要清除並重新建立範例資料嗎？這會建立資料表（如尚未建立）並刪除所有交易與產品資料。此操作可能需要一些時間才能完成，完成後請刷新頁面以查看最新資料。')) return;
 		btn.disabled = true;
 		const initUrl = apiBase + '/init_db';
 		const resetUrl = apiBase + '/reset_seed';
