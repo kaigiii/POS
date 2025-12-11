@@ -1,0 +1,51 @@
+name: Ping Render and ensure DB
+
+on:
+  schedule:
+    # every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping-render:
+    runs-on: ubuntu-latest
+    env:
+      RENDER_URL: https://pos-lb9c.onrender.com
+      ADMIN_KEY: ${{ secrets.RENDER_ADMIN_KEY }}
+    steps:
+      - name: Ping Render health and ensure DB
+        run: |
+          set -euo pipefail
+          echo "RENDER_URL=$RENDER_URL"
+          # Build header arg if ADMIN_KEY provided
+          HEADER_ARG=()
+          if [ -n "${ADMIN_KEY:-}" ]; then
+            HEADER_ARG=( -H "X-ADMIN-KEY: ${ADMIN_KEY}" )
+            echo "Using ADMIN_KEY from secrets"
+          else
+            echo "No ADMIN_KEY provided"
+          fi
+
+          echo "Checking /health..."
+          if curl -fsS --max-time 10 "$RENDER_URL/health"; then
+            echo "health OK"
+          else
+            echo "health check failed or timed out"
+          fi
+
+          echo "Fetching /api/products..."
+          PROD_JSON=$(curl -fsS --max-time 15 "$RENDER_URL/api/products" || echo "null")
+          echo "Products response: ${PROD_JSON}"
+
+          if [ "$PROD_JSON" = "null" ] || [ "$PROD_JSON" = "[]" ]; then
+            echo "No products found; calling /api/init_db"
+            # call init_db with ADMIN header if provided
+            if curl -fsS -X POST "${HEADER_ARG[@]}" "$RENDER_URL/api/init_db"; then
+              echo "init_db triggered successfully"
+            else
+              echo "init_db failed"
+              exit 1
+            fi
+          else
+            echo "Products present; nothing to do"
+          fi
